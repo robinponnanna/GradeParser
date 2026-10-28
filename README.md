@@ -7,8 +7,11 @@ A Python tool that extracts student grade details from university semester grade
 ## Features
 
 - **Native File Dialog**: Automatically launches your operating system's native file picker (macOS, Windows, Linux GNOME) to let you select one or more PDF grade sheets.
+- **Multi-Student Support**: Processes grade cards from different students simultaneously, automatically organizing courses grouped by student and semester.
 - **Robust Table Extraction**: Uses spatial coordinate grouping (`PyMuPDF`) to handle both bordered tables and floating text blocks without losing spaces in course names.
 - **Key Fields Extracted**:
+  - **Name**: Student full name (e.g., `ROBIN PONNANNA .K.M`, `KEVIN B THOMAS`).
+  - **Roll No**: Unique student registration / roll number (e.g., `20241CCS0106`, `20241CCS0116`).
   - **Semester**: Normalized semester name (e.g., `Semester 1`, `Semester 2`, `Semester 3`, `Semester 4`).
   - **Result Date**: Extracted result publication date for each semester.
   - **Course Code**: e.g., `CSE1004`, `MAT1003`, `CCS2504`.
@@ -106,13 +109,13 @@ pip install -r requirements.txt
 
 ## Output Excel Format
 
-| Semester | Result Date | Course Code | Course Name | No. of Credits | Grade |
-| :--- | :---: | :---: | :--- | :---: | :---: |
-| Semester 1 | 27 January 2025 | CSE1004 | Problem Solving Using C | 3 | O |
-| Semester 1 | 27 January 2025 | DES1146 | Introduction to Design Thinking | 1 | O |
-| Semester 2 | 14/07/2025 | ENG2001 | Advanced English | 2 | A+ |
-| Semester 3 | 03/02/2026 | CSE2253 | Data Structures | 3 | A+ |
-| Semester 4 | 01/07/2026 | CCS2504 | Ethical Hacking | 2 | A+ |
+| Name | Roll No | Semester | Result Date | Course Code | Course Name | No. of Credits | Grade |
+| :--- | :---: | :---: | :---: | :---: | :--- | :---: | :---: |
+| ROBIN PONNANNA .K.M | 20241CCS0106 | Semester 1 | 27 January 2025 | CSE1004 | Problem Solving Using C | 3 | O |
+| ROBIN PONNANNA .K.M | 20241CCS0106 | Semester 2 | 14/07/2025 | ENG2001 | Advanced English | 2 | A+ |
+| KEVIN B THOMAS | 20241CCS0116 | Semester 1 | 28/04/2026 | CSE1004 | Problem Solving Using C | 3 | A+ |
+| KEVIN B THOMAS | 20241CCS0116 | Semester 3 | 03/02/2026 | CSE2253 | Data Structures | 3 | O |
+| KEVIN B THOMAS | 20241CCS0116 | Semester 4 | 01/07/2026 | CCS2504 | Ethical Hacking | 2 | A+ |
 
 ---
 

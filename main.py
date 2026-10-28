@@ -124,6 +124,49 @@ def normalize_semester(raw_semester: str) -> str:
     return raw_semester.title()
 
 
+def extract_student_info(full_text: str) -> tuple[str, str]:
+    """
+    Extract Student Name and Roll Number from PDF text.
+    Returns (name, roll_no).
+    """
+    name = "Unknown"
+    # Matches "Student Name: ROBIN PONNANNA .K.M"
+    m_name = re.search(r"Student\s+Name:\s*([^\n\r]+)", full_text, re.IGNORECASE)
+    if m_name:
+        name = m_name.group(1).strip()
+    else:
+        # Matches line "Name" followed by the student name on next line or same line
+        lines = [l.strip() for l in full_text.splitlines() if l.strip()]
+        for idx, line in enumerate(lines):
+            if line.lower() == "name" and idx + 1 < len(lines):
+                cand = lines[idx + 1]
+                if not cand.lower().startswith(("father", "mother", "uid", "roll", "sl.")):
+                    name = cand
+                    break
+            m_inline = re.match(r"^Name[:\s]+(.+)$", line, re.IGNORECASE)
+            if m_inline:
+                cand = m_inline.group(1).strip()
+                if not cand.lower().startswith(("father", "mother", "uid", "roll", "sl.")):
+                    name = cand
+                    break
+
+    roll_no = "Unknown"
+    # Matches "Roll Number: 20241CCS0106" or "Roll No. 20241CCS0106"
+    m_roll = re.search(r"Roll\s*(?:Number|No\.?)[:\s]*([A-Z0-9]+)", full_text, re.IGNORECASE)
+    if m_roll:
+        roll_no = m_roll.group(1).strip()
+    else:
+        lines = [l.strip() for l in full_text.splitlines() if l.strip()]
+        for idx, line in enumerate(lines):
+            if line.lower() in ("roll no.", "roll no", "roll number") and idx + 1 < len(lines):
+                cand = lines[idx + 1]
+                if re.match(r"^[A-Z0-9]+$", cand, re.IGNORECASE):
+                    roll_no = cand
+                    break
+
+    return name, roll_no
+
+
 def extract_semester_info(full_text: str, pdf_filename: str) -> str:
     """Extract semester details from PDF text or fallback to filename."""
     sem_match = re.search(
@@ -152,12 +195,13 @@ def extract_result_date(full_text: str) -> str:
 
 def extract_courses_from_pdf(pdf_path: str) -> list[dict]:
     """
-    Extract course details (Course Code, Course Name, Credits, Grade)
-    along with semester and result date from a given PDF using PyMuPDF.
+    Extract course details (Name, Roll No, Semester, Result Date, Course Code,
+    Course Name, Credits, Grade) from a given PDF using PyMuPDF.
     """
     doc = pymupdf.open(pdf_path)
     full_text = "\n".join(page.get_text() for page in doc)
 
+    student_name, roll_no = extract_student_info(full_text)
     semester = extract_semester_info(full_text, pdf_path)
     result_date = extract_result_date(full_text)
 
@@ -170,7 +214,7 @@ def extract_courses_from_pdf(pdf_path: str) -> list[dict]:
         if not words:
             continue
 
-        # Group words by their vertical position (y-coordinate)
+        # Group words by vertical position (y-coordinate)
         lines_by_y = defaultdict(list)
         for w in words:
             y_mid = (w[1] + w[3]) / 2
@@ -183,9 +227,9 @@ def extract_courses_from_pdf(pdf_path: str) -> list[dict]:
                 matched_key = y_mid
             lines_by_y[matched_key].append(w)
 
-        # Sort lines from top to bottom
+        # Sort lines top-to-bottom
         for y in sorted(lines_by_y.keys()):
-            # Sort words horizontally from left to right
+            # Sort words left-to-right
             line_words = sorted(lines_by_y[y], key=lambda x: x[0])
             tokens = [x[4].strip() for x in line_words if x[4].strip()]
 
@@ -206,6 +250,8 @@ def extract_courses_from_pdf(pdf_path: str) -> list[dict]:
                 # Validate credits (numeric) and grade
                 if credits.isdigit() and valid_grade_regex.match(grade):
                     records.append({
+                        "Name": student_name,
+                        "Roll No": roll_no,
                         "Semester": semester,
                         "Result Date": result_date,
                         "Course Code": course_code,
@@ -240,12 +286,12 @@ def format_excel(excel_path: str):
         cell.font = header_font
         cell.alignment = center_align
 
-    # Style data rows
+    # Style data rows: Name (col 1) and Course Name (col 6) left-aligned; others centered
     for row in range(2, ws.max_row + 1):
         for col in range(1, ws.max_column + 1):
             cell = ws.cell(row=row, column=col)
             cell.border = thin_border
-            if col == 4:  # Course Name column
+            if col in (1, 6):  # Name, Course Name
                 cell.alignment = left_align
             else:
                 cell.alignment = center_align
@@ -295,28 +341,35 @@ def main():
 
     output_excel = f"{output_input}.xlsx"
 
-    # 3. Sort files to keep semester order where possible
-    pdf_files = sorted(pdf_files)
     print(f"\nProcessing {len(pdf_files)} PDF file(s)...")
 
     all_records = []
     for pdf_file in pdf_files:
         records = extract_courses_from_pdf(pdf_file)
-        print(f"  - {os.path.basename(pdf_file)}: extracted {len(records)} courses")
+        if records:
+            name = records[0]["Name"]
+            roll = records[0]["Roll No"]
+            sem = records[0]["Semester"]
+            print(f"  - {os.path.basename(pdf_file)}: [{roll}] {name} ({sem}) -> {len(records)} courses")
+        else:
+            print(f"  - {os.path.basename(pdf_file)}: 0 courses extracted")
         all_records.extend(records)
 
     if not all_records:
         print("No course records extracted from the selected files.")
         return
 
-    # 4. Save to Excel using pandas
+    # 3. Build DataFrame and sort by Student (Roll No/Name) and Semester
     df = pd.DataFrame(all_records)
+    df.sort_values(by=["Roll No", "Semester", "Course Code"], inplace=True)
+
+    # 4. Save to Excel using pandas
     df.to_excel(output_excel, index=False)
 
     # 5. Format the Excel workbook
     format_excel(output_excel)
 
-    print(f"\nSuccessfully extracted {len(df)} course records.")
+    print(f"\nSuccessfully extracted {len(df)} course records across {df['Roll No'].nunique()} student(s).")
     print(f"Saved and formatted Excel file at: {output_excel}\n")
     print("Summary of extracted courses:")
     print(df.to_string(index=False))
