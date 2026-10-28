@@ -67,6 +67,10 @@ source .venv/bin/activate
 # On Windows (PowerShell):
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+
+# On Windows (Command Prompt):
+python -m venv .venv
+.\venv\Scripts\activate.bat
 ```
 
 ### 4. Install Dependencies
