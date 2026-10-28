@@ -18,8 +18,10 @@ A Python tool that extracts student grade details from university semester grade
   - **Course Name**: Full course title without truncation.
   - **No. of Credits**: Numeric credits integer for easy summation.
   - **Grade**: Letter grade (e.g., `O`, `A+`, `A`, `B+`, `B`, `S`).
-- **Custom Output Filename**: Prompts for a custom file name in the console (excluding `.xlsx`).
-- **Formatted Excel Spreadsheets**: Auto-fits column widths, applies a modern dark blue header theme, centers text, and freezes top header row.
+- **Automatic OCR Fallback (`pytesseract`)**: If a PDF is scanned or image-based with no extractable text stream, it automatically falls back to high-resolution OCR via `pytesseract` to extract student details and grade tables.
+- **Automatic Deduplication (Latest Results)**: When multiple entries exist for the same course (e.g. re-evaluations, summer terms, backlogs, make-up exams), only the latest record is retained based on the result announcement date.
+- **Native Save File Dialog**: Opens your operating system's native file manager window to select the destination folder and name or rename the output Excel file directly.
+- **Formatted Excel Spreadsheets with Filter Dropdowns**: Automatically adds filter dropdown arrows to all header columns, auto-fits column widths, applies a modern dark blue header theme, centers text, and freezes the top header row.
 
 ---
 
@@ -29,7 +31,7 @@ A Python tool that extracts student grade details from university semester grade
    - **Linux (GNOME)**: Uses `zenity` for native GTK file selection dialogs.
    - **macOS**: Uses AppleScript (`osascript`) calling the native `choose file` dialog (`NSOpenPanel`).
    - **Windows**: Uses PowerShell calling `System.Windows.Forms.OpenFileDialog`.
-   - **Fallback**: Uses Python's `tkinter` or defaults to the local `Files/` directory.
+   - **Fallback**: Uses Python's `tkinter` file dialog.
 
 2. **Text & Metadata Extraction**:
    - Parses the document text to find the **Semester** (matching roman numerals or ordinal numbers) and the **Result Date**.
@@ -40,9 +42,14 @@ A Python tool that extracts student grade details from university semester grade
    - Parses trailing tokens as `Credits` and `Grade`.
    - Reconstructs intermediate words into the complete `Course Name`.
 
-4. **Excel Export & Styling**:
+4. **Chronological Deduplication**:
+   - Parses each entry's `Result Date` into a chronological timestamp.
+   - For any course code appearing multiple times for a student, only the entry with the latest result announcement date is retained.
+
+5. **Excel Export & Styling**:
    - Assembles records across all selected PDFs into a unified `pandas.DataFrame`.
    - Writes to `.xlsx` using `openpyxl` with custom styling (header fills, borders, cell alignments, auto-adjusted column widths).
+   - Enables native Excel auto-filter dropdown arrows across all columns in the header row.
 
 ---
 
@@ -50,6 +57,10 @@ A Python tool that extracts student grade details from university semester grade
 
 ### 1. Prerequisites
 - **Python 3.9+**
+- **Tesseract OCR (for scanned/image-based PDFs)**:
+  - **Linux**: `sudo apt install tesseract-ocr` or `sudo dnf install tesseract` or `sudo pacman -S tesseract tesseract-data-eng`
+  - **macOS**: `brew install tesseract`
+  - **Windows**: Install the [Tesseract installer for Windows](https://github.com/UB-Mannheim/tesseract/wiki) and add it to your PATH.
 - **OS-specific Dialog Tools**:
   - **Linux**: `zenity` (preinstalled on GNOME; install via `sudo apt install zenity` or `sudo dnf install zenity` or `sudo pacman -S zenity` if missing).
   - **macOS**: Built-in `osascript`.
@@ -94,12 +105,9 @@ pip install -r requirements.txt
    - The file selection dialog will appear.
    - Select one or more semester grade card PDFs and click **Open** / **Submit**.
 
-3. **Enter Output Filename**:
-   - In your console, you will be prompted:
-     ```text
-     Enter output Excel file name (excluding .xlsx): my_grades
-     ```
-   - Press **Enter** (defaults to `student_grades.xlsx` if left blank).
+3. **Choose Save Location & Filename**:
+   - A native file manager "Save As" window will open.
+   - Choose your preferred save directory, rename the file if desired (default: `student_grades.xlsx`), and click **Save**.
 
 4. **View Results**:
    - The console will display the number of courses extracted per file and a tabular summary.
